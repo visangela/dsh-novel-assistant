@@ -1,6 +1,6 @@
 # 小说助手 · dsh-novel-assistant
 
-当前版本 **0.25.0**。
+最新版本见 [Releases](https://github.com/visangela/dsh-novel-assistant/releases)，也可以直接装 [npm 上的同名包](https://www.npmjs.com/package/dsh-novel-assistant)。
 
 小说助手这个工具能做什么？简单来说，它解决的是长篇特有的三件事：记不住、写飘了、改乱了。 如果你：
 
