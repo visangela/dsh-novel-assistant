@@ -1,0 +1,116 @@
+# Novel workflow bundle: one agent preset (`novel`) that mounts the personas,
+# tools and the bundled Markdown skills of the long-form fiction workflow.
+#
+# Install with plugin_manager action=install_bundle target=<this directory>.
+# The preset row id must stay `preset-novel`; the Web editor keys off it.
+- insert:
+    - id: preset-novel
+      name: '@deepseek-ai/dsh-agent-preset'
+      config:
+        id: novel
+        name: 小说创作模式
+        description: 从一句灵感到长篇定稿的多阶段小说工作流：架构、风格卡、大纲、审核、设定库、细纲、正文、检查与关系图。每个阶段有独立技能与用户确认门禁。
+        order: 20
+        plugins:
+          - id: persona
+            name: '@deepseek-ai/dsh-persona'
+            config:
+              prefix: |-
+                你是「砚台」，一个长篇小说创作工作室的主编兼主笔。你与用户合作，把一句灵感逐步写成结构完整、人物可信、有辨识度的长篇小说。
+
+                工作原则（不可违背）：
+                1. 用户的创作决定权高于一切。世界观、人物命运、感情线、主线结局等改动，先给方案与代价，等用户确认后再落笔；不要用「更好的写法」替用户做决定。
+                2. 事实只有一个来源：项目的设定库 bible/。写作前读相关设定，写作后把新事实写回设定库；正文不得发明与设定库冲突的内容。
+                3. 阶段推进有门禁。每个阶段结束用一页以内的汇报说明产出、关键选择、风险、待确认项，然后停下等用户回复；用户未确认不进入下一阶段。
+                4. 改动必须联动。大纲变了，细纲、时间线、伏笔、人物库、读者/主角信息表一起更新，并在 PROJECT.md 记录改动原因。
+                5. 先诊断，再动笔。发现问题时给出证据（章节、原文、冲突点）与 2–3 个可选修法及其代价，让用户选。
+                6. 拒绝「AI 味」：少用总结句、排比堆砌、空泛抒情；多用具体动作、感官细节与潜台词；对话要符合人物身份与说话习惯。
+
+                模型路由：可以用 subagent 为不同任务选择模型（先 list_subagent_models 查看可用项）。建议：架构/审核用强推理模型，风格分析用长上下文模型，细纲用高创意模型，正文用文笔好的模型，逻辑检查用低温严谨模型。无法选择时直接用当前模型，不要阻塞流程。
+
+                项目结构：novel-project/ 下有 PROJECT.md（阶段、进度、决策日志）、bible/（架构/风格/人物/时间线/伏笔/信息表/硬事实/章节摘要/图谱）、outline/（分卷与细纲）、chapters/（正文）、reviews/（各类检查报告）。
+          - id: agent-instructions
+            name: '@deepseek-ai/dsh-agent-instructions'
+            config:
+              maxBytes: 65536
+          - id: time-context
+            name: '@deepseek-ai/dsh-time-context'
+          - id: tool-fs
+            name: '@deepseek-ai/dsh-tool-fs'
+            config:
+              applyPatch: false
+          - id: tool-fs-search
+            name: '@deepseek-ai/dsh-tool-fs-search'
+            config:
+              sampleOverCapGlobResults: false
+          - id: tool-bash
+            name: '@deepseek-ai/dsh-tool-bash'
+            disabled: !!js process.platform === 'win32'
+          - id: tool-pwsh
+            name: '@deepseek-ai/dsh-tool-pwsh'
+            disabled: !!js process.platform !== 'win32'
+          - id: tool-web
+            name: '@deepseek-ai/dsh-tool-web'
+            config:
+              fetch: true
+              searchTimeoutMs: 60000
+          - id: skill-filesystem
+            name: '@deepseek-ai/dsh-skill-filesystem'
+          - id: novel-skills
+            name: 'dsh-novel-assistant/lib/skill-provider.js'
+          - id: tool-skill
+            name: '@deepseek-ai/dsh-tool-skill'
+          - id: command-goal
+            name: '@deepseek-ai/dsh-command-goal'
+          - id: tool-goal
+            name: '@deepseek-ai/dsh-tool-goal'
+          - id: compaction
+            name: cordis:group
+            group: true
+            isolate:
+              compaction: true
+              toolResultPruner: true
+            config:
+              - id: compaction-basic
+                name: '@deepseek-ai/dsh-compaction-basic'
+              - id: command-compact
+                name: '@deepseek-ai/dsh-command-compact'
+              - id: tool-result-pruner
+                name: '@deepseek-ai/dsh-compaction-tool-result-pruner'
+                config:
+                  thresholdChars: 8192
+                  headChars: 4096
+                  tailChars: 1024
+          - id: delegation
+            name: cordis:group
+            group: true
+            isolate:
+              workflowEngine: true
+            config:
+              - id: tool-subagent-control
+                name: '@deepseek-ai/dsh-tool-subagent-control'
+              - id: tool-subagent
+                name: '@deepseek-ai/dsh-tool-subagent'
+                config:
+                  provider: spawn
+                  toolName: subagent
+                  modelSelection: true
+                  modelDiscovery: true
+              - id: tool-subagent-fork
+                name: '@deepseek-ai/dsh-tool-subagent'
+                config:
+                  provider: fork
+                  toolName: subagent_fork
+          - id: tool-ask-user
+            name: '@deepseek-ai/dsh-tool-ask-user'
+          - id: tool-todo
+            name: '@deepseek-ai/dsh-tool-todo'
+            config:
+              allowParallelInProgress: true
+          - id: present
+            name: '@deepseek-ai/dsh-tool-present'
+    # 改稿面板的宿主半侧：status / chapter / save / archive / reconcile / trace / graph 等路由。
+    # 挂在 profile 顶层而不是 preset 里——面板是 Host 的界面，不属于某一场会话。
+    # 行名必须是包根：客户端清单只按「模块名 == 包名」的行去解析，写子路径会让面板不进启动图。
+    - id: novel-panel
+      name: 'dsh-novel-assistant'

@@ -1,0 +1,45 @@
+{
+  "name": "dsh-novel-assistant",
+  "version": "0.25.0",
+  "type": "module",
+  "description": "Long-form fiction writing workflow preset for DeepSeek Harness",
+  "license": "MIT",
+  "author": "Haiyan Yang <angela.yhy25@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/visangela/dsh-novel-assistant.git"
+  },
+  "homepage": "https://github.com/visangela/dsh-novel-assistant#readme",
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "novel",
+    "fiction",
+    "writing",
+    "chinese",
+    "long-form"
+  ],
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./lib/*": "./lib/*",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true
+    }
+  },
+  "files": [
+    "CHANGELOG.md",
+    "README.md",
+    "cordis.patch.yml",
+    "docs",
+    "lib",
+    "skills"
+  ]
+}
