@@ -1,10 +1,13 @@
 #!/usr/bin/env node
 /**
- * 强度曲线自检：只查三种「形状」，不评价写得好不好。
+ * 强度曲线自检：只查两种「形状」，不评价写得好不好。
  *
  * 1. 平线：同一条故事线连续 3 章一个值 —— 这条线三章没有推进。
  * 2. 掉速：前一章 ≥4、下一章掉 ≥2 分 —— 通常是该爆的地方写软了。
- * 3. 断钩：埋了一条伏笔，之后两章内主线跌到 ≤1 —— 埋了没接。
+ *
+ * 这里**不查钩子**。曾经的「埋点后两章主线跌到 ≤1 就报警」已删除：它逼着写手
+ * 在埋点章把主线拉高、把伏笔做得更醒目，与「伏笔要写得不像伏笔」直接冲突。
+ * 钩子质量改由 novel-quick-check 第 7 项人工核（章末是否停在未完成的动作上）。
  *
  * 用法：
  *   node plot-check.mjs [--project novel-project] [--json] [--min-run 3] [--drop 2]
@@ -132,37 +135,6 @@ function main() {
     }
   })
 
-  // 3. 断钩：埋了伏笔，之后两章内主线跌到 ≤1
-  const foreFile = join(projectDir, 'bible', 'foreshadowing.md')
-  if (existsSync(foreFile)) {
-    const foreText = readFileSync(foreFile, 'utf8')
-    const table = parseTable(section(foreText, '伏笔') || foreText)
-    const head = table.header.join('|')
-    const plantedAt = table.header.findIndex((cell) => /埋设/.test(cell))
-    const idAt = table.header.findIndex((cell) => /编号|ID/i.test(cell))
-    const mainLine = points.map((point) => point.values[0])
-    if (plantedAt >= 0) {
-      table.rows.forEach((row) => {
-        const match = String(row[plantedAt] || '').match(/(\d+)/)
-        if (!match) return
-        const planted = Number(match[1])
-        for (const delta of [1, 2]) {
-          const at = points.findIndex((point) => point.chapter === planted + delta)
-          if (at < 0) continue
-          const value = mainLine[at]
-          if (value !== null && value <= 1) {
-            const id = idAt >= 0 ? String(row[idAt] || '').trim() : '（未编号）'
-            push('hook', `${id} 埋在第 ${planted} 章，第 ${planted + delta} 章主线跌到 ${value} 分：埋了钩子没接上`, {
-              series: series[0], from: planted, to: planted + delta, id,
-            })
-            break
-          }
-        }
-      })
-      void head
-    }
-  }
-
   const result = {
     ok: notes.length === 0,
     chapters: points.length,
@@ -179,11 +151,11 @@ function main() {
 
   console.log(`强度曲线：${points.length} 章 × ${series.length} 条线（平线阈值 ${options.minRun} 章，掉速阈值 ${options.drop} 分）`)
   if (!notes.length) {
-    console.log('✔ 没有平线、没有掉速、没有断钩。')
+    console.log('✔ 没有平线、没有掉速。')
     process.exit(0)
   }
   for (const note of notes) {
-    const mark = note.kind === 'hook' ? '✘' : '△'
+    const mark = '△'
     console.log(`${mark} [${note.kind}] ${note.message}`)
   }
   console.log(`\n共 ${notes.length} 条。这些只是「值得看一眼」的位置，不是判词：平线可能是刻意的铺垫，掉速也可能是换线叙述。`)
