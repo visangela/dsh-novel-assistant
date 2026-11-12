@@ -241,7 +241,9 @@ node <技能 Base directory>/tools/render-graph.mjs --project novel-project
 | `relationship-map.svg` | 全量关系图：档位圈大小 + 关系线型 + 张力说明 | 自己复盘、给编辑 |
 | `relationship-map-clean.svg` | 无剧透版：只画人物与关系类型，不写张力与真相 | 对外分享、宣传物料 |
 | `plot-map.svg` | 故事线强度折线（单调三次插值，保留每章圆点） | 节奏复盘，阶段 8 自检 |
-| `plot-map-scenes.svg` | 场景节点图：按章自上而下，标「埋 / 收 / 转折」 | 结构复盘、拆章讨论 |
+| `plot-map-scenes.svg` | 场景节点图：按章自上而下，标「埋 / 收 / 转折」 | 导出、贴文档 |
+
+> 面板里的「场景图谱」页已改为 **HTML 版**：一章一行、五章一组折叠，40 章也能一屏看到骨架；点章节展开场景卡。SVG 仍由 `render-graph.mjs` 生成，留作导出用途，两份数据同源（都读「场景节点」表）。
 
 场景节点图的数据来自 `plot-map.md` 里新增的「## 场景节点」表：
 
