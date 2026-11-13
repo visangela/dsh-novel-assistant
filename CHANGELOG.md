@@ -2,6 +2,12 @@
 
 版本号跟着「能力」走，不跟修 bug 走；0.x 阶段一切接口都可能变，但每个版本的技能契约都有测试兜底（`test/check-skills.mjs` 等三套）。
 
+## 0.27.0 — 安全：写接口补 Host 准入与 Content-Type 校验
+
+- 面板 13 条路由全部先过 `ctx.connection.requestRejection(req)`（无 Connection 服务时退到 `Sec-Fetch-Site` / `Origin` 最小判定），不再假设 `webServer.register` 的精确路由自带围栏——它并不带。
+- 四条 POST 写接口额外要求 `content-type: application/json`，否则 415：跨站表单与 `text/plain` 简单请求会在这一层被挡掉。
+- 起因：插件市场收录评审指出「浏览器里任何网页都能跨站 POST 触发写接口」。
+
 ## 0.26.2 — 修正版本判断文案
 
 - 实测结论：DSH 0.2.1-rc.2 + 插件 0.25.5 可正常工作；0.25.0 因为用 `resource` 注册路由而在 0.2.1 上全挂。

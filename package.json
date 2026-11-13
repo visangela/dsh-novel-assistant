@@ -1,6 +1,6 @@
 {
   "name": "dsh-novel-assistant",
-  "version": "0.26.2",
+  "version": "0.27.0",
   "type": "module",
   "description": "Long-form fiction writing workflow preset for DeepSeek Harness",
   "license": "MIT",
