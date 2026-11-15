@@ -429,25 +429,32 @@ function relationshipSVG(parsed, meta, opts = {}) {
     const g = geoms[i];
     const s = REL[e.kind];
     const cross = clusterOf && clusterOf.has(e.a) && clusterOf.has(e.b) && clusterOf.get(e.a) !== clusterOf.get(e.b);
-    parts.push(`<path d="M ${fmt(g.x1)} ${fmt(g.y1)} Q ${fmt(g.cx)} ${fmt(g.cy)} ${fmt(g.x2)} ${fmt(g.y2)}"
+    // 线本身也要带 data-a/data-b：面板按这两个属性做「悬停某人只留他的关系」，
+    // 只给标签挂属性会让大多数连线在悬停时纹丝不动（跨簇连线更是连标签都不画）。
+    const tip = opts.clean ? '' : (e.label ? `${s.label} / ${e.label}` : s.label);
+    // 敌对关系的 × 记号也放进同一个 group：否则悬停压暗时线暗了、记号还亮着
+    let inner = `<path d="M ${fmt(g.x1)} ${fmt(g.y1)} Q ${fmt(g.cx)} ${fmt(g.cy)} ${fmt(g.x2)} ${fmt(g.y2)}"
       fill="none" stroke="${s.stroke}" stroke-width="${s.width}" stroke-linecap="round"
       ${cross ? 'stroke-opacity=".38"' : ''}
-      ${s.dash ? `stroke-dasharray="${s.dash}"` : ''} marker-end="url(#arw)"/>`);
+      ${s.dash ? `stroke-dasharray="${s.dash}"` : ''} marker-end="url(#arw)"/>`;
     if (e.kind === 'foe') {
       const m = quadAt(g, 0.5);
       const k = 6;
-      parts.push(`<g stroke="${s.stroke}" stroke-width="2" stroke-linecap="round">
+      inner += `<g stroke="${s.stroke}" stroke-width="2" stroke-linecap="round">
         <line x1="${fmt(m.x - k)}" y1="${fmt(m.y - k)}" x2="${fmt(m.x + k)}" y2="${fmt(m.y + k)}"/>
-        <line x1="${fmt(m.x - k)}" y1="${fmt(m.y + k)}" x2="${fmt(m.x + k)}" y2="${fmt(m.y - k)}"/></g>`);
+        <line x1="${fmt(m.x - k)}" y1="${fmt(m.y + k)}" x2="${fmt(m.x + k)}" y2="${fmt(m.y - k)}"/></g>`;
     }
+    parts.push(`<g class="link" data-a="${esc(e.a)}" data-b="${esc(e.b)}"${tip ? ` data-tip="${esc(tip)}"` : ''}>`
+      + (tip ? `<title>${esc(tip)}</title>` : '') + inner + '</g>');
   });
 
   // 标签：沿弧线找不撞节点、不撞已放标签的位置；被推离时画引线
   const placed = [];
   parsed.edges.forEach((e, i) => {
     const g = geoms[i];
-    // 跨簇的连线只画线不摆字（悬停仍可看标签），否则 17 人的图会被说明文字埋掉
-    if (clusterOf && clusterOf.has(e.a) && clusterOf.has(e.b) && clusterOf.get(e.a) !== clusterOf.get(e.b)) return;
+    // 跨簇连线平时不摆字（否则 17 人的图会被说明文字埋掉），但标签仍要生成：
+    // 悬停某个人时由面板把它显示出来，否则高亮出来的线没有名字，看不出是什么关系。
+    const crossLabel = !!(clusterOf && clusterOf.has(e.a) && clusterOf.has(e.b) && clusterOf.get(e.a) !== clusterOf.get(e.b));
     const s = REL[e.kind];
     const text = REL[e.kind]?.label || '';
     const tip = opts.clean ? '' : (e.label || '');
@@ -506,7 +513,7 @@ function relationshipSVG(parsed, meta, opts = {}) {
     const tspans = lines
       .map((l, li) => `<tspan x="${fmt(best.x)}" y="${fmt(ty + li * 15)}">${esc(clip(l))}</tspan>`)
       .join('');
-    parts.push(`<g class="edge" data-a="${esc(e.a)}" data-b="${esc(e.b)}"${tip ? ` data-tip="${esc(tip)}"` : ''}>${tip ? `<title>${esc(tip)}</title>` : ''}<rect x="${fmt(best.x - w / 2)}" y="${fmt(best.y - h / 2)}" width="${fmt(w)}" height="${h}" rx="7"
+    parts.push(`<g class="edge${crossLabel ? ' cross' : ''}" data-a="${esc(e.a)}" data-b="${esc(e.b)}"${crossLabel ? ' data-cross="1" opacity="0"' : ''}${tip ? ` data-tip="${esc(tip)}"` : ''}>${tip ? `<title>${esc(tip)}</title>` : ''}<rect x="${fmt(best.x - w / 2)}" y="${fmt(best.y - h / 2)}" width="${fmt(w)}" height="${h}" rx="7"
       fill="#12141a" fill-opacity=".94" stroke="${s.stroke}" stroke-opacity=".35"/>
       <text text-anchor="middle" font-family='${FONT}' font-size="11.5" fill="${s.text}">${tspans}</text></g>`);
   });
