@@ -71,11 +71,12 @@ const DEGREE = new Map();
 
 /* ---------------------------------------------------------------- 关系图 */
 
+// 线宽一律 1.3（与「利益」一致）：粗细不承载含义，类别靠颜色 + 虚实，悬停时再加粗
 const REL = {
-  kin: { key: 'kin', stroke: '#e0b84c', width: 3.2, dash: null, text: '#f0d48a', label: '亲情' },
-  master: { key: 'master', stroke: '#5fbf9a', width: 3, dash: '9 4', text: '#8fd8bd', label: '师门' },
-  love: { key: 'love', stroke: '#d07ab0', width: 2.6, dash: '7 5', text: '#e6a8cd', label: '爱情' },
-  foe: { key: 'foe', stroke: '#c0504d', width: 2.6, dash: '3 4', text: '#e08d8a', label: '敌对' },
+  kin: { key: 'kin', stroke: '#e0b84c', width: 1.3, dash: null, text: '#f0d48a', label: '亲情' },
+  master: { key: 'master', stroke: '#5fbf9a', width: 1.3, dash: '9 4', text: '#8fd8bd', label: '师门' },
+  love: { key: 'love', stroke: '#d07ab0', width: 1.3, dash: '7 5', text: '#e6a8cd', label: '爱情' },
+  foe: { key: 'foe', stroke: '#c0504d', width: 1.3, dash: '3 4', text: '#e08d8a', label: '敌对' },
   deal: { key: 'deal', stroke: '#7f8ea3', width: 1.3, dash: null, text: '#a9b6c6', label: '利益' },
 };
 
@@ -350,17 +351,40 @@ function clusterLayout(parsed) {
     clusters.push({ name: h.name, x: hx, y: hy, r: rs + 62, members: membersHere.map((m) => m.name) });
   });
 
-  const pad = 150;
-  const xs = [...pos.values()].map((p) => p.x);
-  const ys = [...pos.values()].map((p) => p.y);
-  const minX = Math.min(...xs) - pad;
-  const maxX = Math.max(...xs) + pad;
-  const minY = Math.min(...ys) - pad * 0.8;
-  const maxY = Math.max(...ys) + pad * 0.8;
-  const W = Math.max(760, Math.min(1400, Math.round(maxX - minX)));
-  const H = Math.max(560, Math.min(1200, Math.round(maxY - minY)));
-  const shiftX = -minX;
-  const shiftY = -minY;
+  // 画布按「圆圈外缘」而不是圆心算，否则贴边的节点会被裁掉半个圆
+  const RAD = { 1: 54, 2: 42, 3: 28 };
+  const bounds = () => {
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (const n of parsed.nodes) {
+      const p = pos.get(n.name);
+      if (!p) continue;
+      const r = RAD[n.tier] ?? 28;
+      minX = Math.min(minX, p.x - r); maxX = Math.max(maxX, p.x + r);
+      minY = Math.min(minY, p.y - r); maxY = Math.max(maxY, p.y + r);
+    }
+    return { minX, maxX, minY, maxY };
+  };
+  const pad = 120;
+  let box = bounds();
+  let w = box.maxX - box.minX + pad * 2;
+  let h = box.maxY - box.minY + pad * 2;
+  // 人太多时按比例缩小整个布局，而不是把画布撑爆（撑爆就会被裁）
+  const MAXW = 1600;
+  const MAXH = 1500;
+  if (w > MAXW || h > MAXH) {
+    const k = Math.min(MAXW / w, MAXH / h);
+    const ox = (box.minX + box.maxX) / 2;
+    const oy = (box.minY + box.maxY) / 2;
+    for (const p of pos.values()) { p.x = ox + (p.x - ox) * k; p.y = oy + (p.y - oy) * k; }
+    clusters.forEach((c) => { c.x = ox + (c.x - ox) * k; c.y = oy + (c.y - oy) * k; c.r *= k; });
+    box = bounds();
+    w = box.maxX - box.minX + pad * 2;
+    h = box.maxY - box.minY + pad * 2;
+  }
+  const W = Math.max(760, Math.round(w));
+  const H = Math.max(560, Math.round(h));
+  const shiftX = -(box.minX - pad);
+  const shiftY = -(box.minY - pad);
   for (const p of pos.values()) { p.x += shiftX; p.y += shiftY; }
   clusters.forEach((c) => { c.x += shiftX; c.y += shiftY; });
   return { pos, W, H, clusters, hubs };
@@ -407,7 +431,11 @@ function relationshipSVG(parsed, meta, opts = {}) {
   }
   const parts = [];
   parts.push(`<defs>
-    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9.1" markerHeight="9.1"
+      markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="context-stroke"/></marker>
+    <marker id="arw-lg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="13.6" markerHeight="13.6"
+      markerUnits="userSpaceOnUse" orient="auto-start-reverse">
       <path d="M0,0 L10,5 L0,10 z" fill="context-stroke"/></marker>
     <filter id="sh" x="-30%" y="-30%" width="160%" height="160%">
       <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#000" flood-opacity=".45"/></filter>
@@ -433,8 +461,9 @@ function relationshipSVG(parsed, meta, opts = {}) {
     // 只给标签挂属性会让大多数连线在悬停时纹丝不动（跨簇连线更是连标签都不画）。
     const tip = opts.clean ? '' : (e.label ? `${s.label} / ${e.label}` : s.label);
     // 敌对关系的 × 记号也放进同一个 group：否则悬停压暗时线暗了、记号还亮着
-    let inner = `<path d="M ${fmt(g.x1)} ${fmt(g.y1)} Q ${fmt(g.cx)} ${fmt(g.cy)} ${fmt(g.x2)} ${fmt(g.y2)}"
-      fill="none" stroke="${s.stroke}" stroke-width="${s.width}" stroke-linecap="round"
+    const d = `M ${fmt(g.x1)} ${fmt(g.y1)} Q ${fmt(g.cx)} ${fmt(g.cy)} ${fmt(g.x2)} ${fmt(g.y2)}`;
+    // 提示由面板按「离鼠标最近的线」几何判定，这里不再铺透明热区
+    let inner = `<path d="${d}" fill="none" stroke="${s.stroke}" stroke-width="${s.width}" stroke-linecap="round"
       ${cross ? 'stroke-opacity=".38"' : ''}
       ${s.dash ? `stroke-dasharray="${s.dash}"` : ''} marker-end="url(#arw)"/>`;
     if (e.kind === 'foe') {
@@ -445,7 +474,7 @@ function relationshipSVG(parsed, meta, opts = {}) {
         <line x1="${fmt(m.x - k)}" y1="${fmt(m.y + k)}" x2="${fmt(m.x + k)}" y2="${fmt(m.y - k)}"/></g>`;
     }
     parts.push(`<g class="link" data-a="${esc(e.a)}" data-b="${esc(e.b)}"${tip ? ` data-tip="${esc(tip)}"` : ''}>`
-      + (tip ? `<title>${esc(tip)}</title>` : '') + inner + '</g>');
+      + inner + '</g>');
   });
 
   // 标签：沿弧线找不撞节点、不撞已放标签的位置；被推离时画引线
@@ -513,7 +542,7 @@ function relationshipSVG(parsed, meta, opts = {}) {
     const tspans = lines
       .map((l, li) => `<tspan x="${fmt(best.x)}" y="${fmt(ty + li * 15)}">${esc(clip(l))}</tspan>`)
       .join('');
-    parts.push(`<g class="edge${crossLabel ? ' cross' : ''}" data-a="${esc(e.a)}" data-b="${esc(e.b)}"${crossLabel ? ' data-cross="1" opacity="0"' : ''}${tip ? ` data-tip="${esc(tip)}"` : ''}>${tip ? `<title>${esc(tip)}</title>` : ''}<rect x="${fmt(best.x - w / 2)}" y="${fmt(best.y - h / 2)}" width="${fmt(w)}" height="${h}" rx="7"
+    parts.push(`<g class="edge${crossLabel ? ' cross' : ''}" data-a="${esc(e.a)}" data-b="${esc(e.b)}"${crossLabel ? ' data-cross="1" opacity="0" pointer-events="none"' : ''}${tip ? ` data-tip="${esc(tip)}"` : ''}><rect x="${fmt(best.x - w / 2)}" y="${fmt(best.y - h / 2)}" width="${fmt(w)}" height="${h}" rx="7"
       fill="#12141a" fill-opacity=".94" stroke="${s.stroke}" stroke-opacity=".35"/>
       <text text-anchor="middle" font-family='${FONT}' font-size="11.5" fill="${s.text}">${tspans}</text></g>`);
   });
