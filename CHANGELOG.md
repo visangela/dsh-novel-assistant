@@ -1,5 +1,11 @@
 # 更新日志
 
+## 0.27.4 — Host 错误码化（为界面双语做准备）
+
+- 13 条路由的错误响应带 `code`（`dir-missing` / `not-a-directory` / `bad-chapter-path` / `empty-text` / `no-baseline` / `no-previous` / `missing-chapter` / `host-rejected` / `get-only` / `post-only` / `json-only` / `server-error`），`error` 字段保留原文兜底
+- `fail()` 放在模块作用域（此前误放在 `apply` 内，`browseDir` 调用时会 ReferenceError）
+- 新增 `test/check-host.mjs`、`test/check-client.mjs`，`npm test` 串起五个检查
+
 ## 0.27.3 — 目录选择器可直接选中某一行
 
 - 目录选择器每行右侧新增「选这个」：不必先进去再点「选这个目录」，直接选中该子目录并加载
