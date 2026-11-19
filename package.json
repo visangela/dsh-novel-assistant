@@ -1,6 +1,6 @@
 {
   "name": "dsh-novel-assistant",
-  "version": "0.28.0",
+  "version": "0.28.1",
   "type": "module",
   "description": "Long-form fiction writing workflow preset for DeepSeek Harness",
   "license": "MIT",
@@ -40,6 +40,10 @@
     "cordis.patch.yml",
     "docs",
     "lib",
-    "skills"
-  ]
+    "skills",
+    "test"
+  ],
+  "scripts": {
+    "test": "node test/check-skills.mjs && node test/check-reconcile.mjs && node test/check-import.mjs && node test/check-host.mjs && node test/check-client.mjs"
+  }
 }

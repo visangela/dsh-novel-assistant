@@ -66,13 +66,24 @@ else {
   if (typeof mod.apply !== 'function') problems.push('导出的 apply 不是函数')
   else {
     const regs = []
-    const ctx = {
-      slots: { inject: (n, fn) => { const r = fn && fn(); regs.push(r); return r }, register: (spec, comp) => ({ spec, comp }) },
+    const slots = { inject: (n, fn) => { const r = fn && fn(); regs.push(r); return r }, register: (spec, comp) => ({ spec, comp }) }
+    // 模拟 cordis：未注入的服务属性一访问就抛错（真实宿主里会让整条 entry 激活失败）
+    const strictCtx = new Proxy({ slots, effect: (fn) => fn && fn(), get: () => null }, {
+      get(target, key) {
+        if (key in target) return target[key]
+        throw new Error(`service "${String(key)}" is not available`)
+      },
+    })
+    try { mod.apply(strictCtx) } catch (e) { problems.push(`apply() 在严格 ctx 下抛错：${e.message}`) }
+    if (!regs.some((r) => r && r.comp)) problems.push('apply() 没有注册任何界面组件')
+
+    // 再跑一次：有 locale 服务时应注册字典并绑定，且不抛错
+    const strictCtx2 = new Proxy({
+      slots: { inject: (n, fn) => fn && fn(), register: (spec, comp) => ({ spec, comp }) },
       effect: (fn) => fn && fn(),
-      get: () => null,
-      locale: null,
-    }
-    try { mod.apply(ctx) } catch (e) { problems.push(`apply() 抛错：${e.message}`) }
+      get: (name) => (name === 'locale' ? { register() {}, bind: () => (k) => k } : undefined),
+    }, { get(target, key) { if (key in target) return target[key]; throw new Error(`service "${String(key)}" is not available`) } })
+    try { mod.apply(strictCtx2) } catch (e) { problems.push(`apply() 在有 locale 服务时抛错：${e.message}`) }
     if (!regs.some((r) => r && r.comp)) problems.push('apply() 没有注册任何界面组件')
   }
 }

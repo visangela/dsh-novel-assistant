@@ -1,5 +1,12 @@
 # 更新日志
 
+## 0.28.1 — 修复：启动崩溃（读取未注入的 locale 服务）
+
+- 根因：`apply()` 里写了 `(ctx.get && ctx.get('locale')) || ctx.locale`。cordis 对**未注入的服务属性**一访问就抛错，`apply()` 抛出后整条 entry 激活失败 —— 宿主表现为 `web boot: 1 entry did not activate` / `dsh-novel-assistant: failed`，DSH 起不来
+- 修法：新增模块级 `getLocale(ctx)`，只走 `ctx.get('locale')` 且包在 try/catch 里；取不到就用中文
+- 回归测试：`test/check-client.mjs` 改用 **Proxy 严格 ctx**（访问未注入服务即抛错），并额外跑一次「有 locale 服务」的分支；老代码在该测试下会红
+- 版本 0.28.0 → 0.28.1（0.28.0 的功能不变：双语 156 键、选择器「选这个」、错误码化）
+
 ## 0.28.0 — 界面双语（中/英）
 
 - 面板全部界面文案走 `locale` 服务：`ZH` / `EN` 各 156 键，键集一致；`apply()` 里注册命名空间 `novel-assistant`，拿不到语言服务就退回中文
