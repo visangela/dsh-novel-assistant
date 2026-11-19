@@ -1,5 +1,11 @@
 # 更新日志
 
+## 0.28.4 — 面板场景页的标记也跟随语言
+
+- 场景卡里的「埋 F001 / 转折 / 收 F004 / 收束」按界面语言显示为 Plant / Turn / Payoff / End；编号与作者括号备注（代价兑现）保持原样
+- 组头点阵图例、页内图例里的「埋 / 收」改用字典（`mark.plant` / `mark.pay`），不再硬编码中文
+- 读 `<html lang>` 判断中英，切换语言后随渲染刷新
+
 ## 0.28.3 — 图谱 SVG 支持英文标签
 
 - `render-graph.mjs` 新增 `--lang zh|en`（默认 `zh`）：只翻我们自己写的字（标题、说明、图例、关系类型 Kin/Mentor/Love/Rival/Deal、伏笔标记 Plant/Payoff/Turn/End、`Ch. N`、`N scenes`），人名/事件/伏笔编号/作者备注原样保留
