@@ -1,5 +1,14 @@
 # 更新日志
 
+## 0.28.0 — 界面双语（中/英）
+
+- 面板全部界面文案走 `locale` 服务：`ZH` / `EN` 各 156 键，键集一致；`apply()` 里注册命名空间 `novel-assistant`，拿不到语言服务就退回中文
+- 侧栏名、四个页签、按钮与工具栏、目录选择器、空状态、级别说明、搜索结果、图谱与溯源提示全部可切换
+- `cordis.patch.yml` 与 `novel-workflow` 增加「语言跟随用户」：英文提问就用英文汇报、写稿；设定库表头保持中文（脚本按中文表头解析）
+- 目录选择器每行可直接「选这个」；空状态提示选到含 `PROJECT.md` 的层级
+- Host 13 条路由错误码化（`code` + 原文 `error` 兜底）；`fail()` 移回模块作用域
+- 已知边界：图谱 SVG 里的关系类型与伏笔标记仍是中文；bible 表头保持中文
+
 ## 0.27.4 — Host 错误码化（为界面双语做准备）
 
 - 13 条路由的错误响应带 `code`（`dir-missing` / `not-a-directory` / `bad-chapter-path` / `empty-text` / `no-baseline` / `no-previous` / `missing-chapter` / `host-rejected` / `get-only` / `post-only` / `json-only` / `server-error`），`error` 字段保留原文兜底
