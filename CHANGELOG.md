@@ -1,5 +1,11 @@
 # 更新日志
 
+## 0.28.2 — 修复：切到英文后面板仍是中文
+
+- 根因：插件的 `apply()` 早于语言服务就绪，`ctx.get('locale')` 当时返回 `undefined`，翻译函数被固化成中文；语言服务之后注册上来也不会再绑定
+- 修法：`t()` 每次调用时再看一眼绑定；`apply()` 先试一次 `getLocale()`，再注册 `ctx.inject(['locale'], …)` 等服务就绪后补注册并绑定；`ctx.inject` 的读取也包在 try 里（严格 ctx 下读属性会抛）
+- 测试：`check-client.mjs` 拆成三个独立沙箱场景——严格 ctx / 语言服务已就绪 / 语言服务晚到；最后一种断言标签从「小说助手」变成英文
+
 ## 0.28.1 — 修复：启动崩溃（读取未注入的 locale 服务）
 
 - 根因：`apply()` 里写了 `(ctx.get && ctx.get('locale')) || ctx.locale`。cordis 对**未注入的服务属性**一访问就抛错，`apply()` 抛出后整条 entry 激活失败 —— 宿主表现为 `web boot: 1 entry did not activate` / `dsh-novel-assistant: failed`，DSH 起不来
