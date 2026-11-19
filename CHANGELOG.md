@@ -1,5 +1,11 @@
 # 更新日志
 
+## 0.28.3 — 图谱 SVG 支持英文标签
+
+- `render-graph.mjs` 新增 `--lang zh|en`（默认 `zh`）：只翻我们自己写的字（标题、说明、图例、关系类型 Kin/Mentor/Love/Rival/Deal、伏笔标记 Plant/Payoff/Turn/End、`Ch. N`、`N scenes`），人名/事件/伏笔编号/作者备注原样保留
+- 面板「重画」按当前界面语言传 `lang`（读 `<html lang>`），切到英文后重画即是英文图
+- `novel-graph/SKILL.md` 补用法说明
+
 ## 0.28.2 — 修复：切到英文后面板仍是中文
 
 - 根因：插件的 `apply()` 早于语言服务就绪，`ctx.get('locale')` 当时返回 `undefined`，翻译函数被固化成中文；语言服务之后注册上来也不会再绑定

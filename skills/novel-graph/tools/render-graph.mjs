@@ -25,6 +25,84 @@ const MUTE = '#9aa3b0';
 const GRID = '#2a2f3a';
 const BG = '#12141a';
 
+/* ---------------------------------------------------------------- 语言 */
+
+/**
+ * SVG 里的文字不进界面语言（画在画布上），所以单独一条：`--lang en` 出英文。
+ * 数据本身（人名、事件、伏笔编号）不翻译，只翻译我们自己写的标签与说明。
+ */
+const LANGS = ['zh', 'en'];
+let LANG = 'zh';
+const setLang = (value) => {
+  const v = String(value || '').toLowerCase();
+  LANG = LANGS.includes(v) ? v : 'zh';
+};
+
+const STR = {
+  'rel.title': { zh: '人物关系图', en: 'Character map' },
+  'rel.titleClean': { zh: '人物关系图（无剧透版）', en: 'Character map (spoiler-free)' },
+  'rel.meta': {
+    zh: '圈越大越重要｜共 {people} 人 · {edges} 条关系',
+    en: 'Bigger circle = more important｜{people} people · {edges} ties',
+  },
+  'plot.title': { zh: '情节发展地图 · 故事线强度', en: 'Story intensity' },
+  'plot.titleVol': { zh: '情节发展地图 · 故事线强度（{vol}）', en: 'Story intensity ({vol})' },
+  'plot.sub': {
+    zh: '每条折线一条故事线｜转折处用单调三次曲线连接｜圆圈是每章实际取值',
+    en: 'One line per storyline｜monotone cubic curves at turns｜dots are per-chapter values',
+  },
+  'plot.meta': { zh: '共 {chapters} 章 · {lines} 条线', en: '{chapters} chapters · {lines} storylines' },
+  'plot.axis': { zh: '章', en: 'Ch' },
+  'scenes.title': { zh: '情节发展地图 · 场景节点', en: 'Scene map' },
+  'scenes.sub': {
+    zh: '按章自上而下；同一章内按场景顺序；红线为转折，黄线为埋点，青线为回收点',
+    en: 'Chapters top-down, scenes in order; red = turn, amber = plant, teal = payoff',
+  },
+  'scenes.folded': {
+    zh: '{n} 个场景超过 30，已按章折叠；展开看场景请按卷拆分或改小 range',
+    en: '{n} scenes exceed 30 — folded by chapter; split by volume or narrow the range to expand',
+  },
+  'scenes.chapterBand': { zh: '第 {n} 章 · {scenes} 个场景', en: 'Ch. {n} · {scenes} scenes' },
+  'scenes.chapterBandTurns': { zh: '第 {n} 章 · {scenes} 个场景 · {turns} 个转折', en: 'Ch. {n} · {scenes} scenes · {turns} turns' },
+  'scenes.chapter': { zh: '第 {n} 章', en: 'Ch. {n}' },
+  'tag.plant': { zh: '埋', en: 'Plant' },
+  'tag.payoff': { zh: '收', en: 'Payoff' },
+  'tag.turn': { zh: '转折', en: 'Turn' },
+  'tag.end': { zh: '收束', en: 'End' },
+  'rel.kin': { zh: '亲情', en: 'Kin' },
+  'rel.master': { zh: '师门', en: 'Mentor' },
+  'rel.love': { zh: '爱情', en: 'Love' },
+  'rel.foe': { zh: '敌对', en: 'Rival' },
+  'rel.deal': { zh: '利益', en: 'Deal' },
+}
+
+/** 取一条本地化字符串，支持 {name} 占位。 */
+const tr = (key, params) => {
+  const entry = STR[key];
+  const template = (entry && (entry[LANG] || entry.zh)) || key;
+  if (!params) return template;
+  return template.replace(/\{(\w+)\}/g, (match, name) => (name in params ? String(params[name]) : match));
+};
+
+/** 关系类型标签（图例与卡片都用它）。 */
+const relLabel = (kind) => tr(`rel.${kind || 'deal'}`);
+
+/** 伏笔/事件标记：只翻动词，编号与括号里的作者备注保持原样。 */
+function tagText(tag) {
+  if (!tag || LANG === 'zh') return tag || '';
+  return String(tag)
+    .split('、')
+    .map((seg) => {
+      const t = seg.trim();
+      if (/^收束/.test(t)) return tr('tag.end');
+      if (/^转折|^反转/.test(t)) return tr('tag.turn');
+      if (/^埋/.test(t)) return t.replace(/^埋\s*/, `${tr('tag.plant')} `);
+      if (/^收/.test(t)) return t.replace(/^收\s*/, `${tr('tag.payoff')} `);
+      return t;
+    })
+    .join(' · ');
+}
+
 /* ---------------------------------------------------------------- 参数 */
 
 function parseArgs(argv) {
@@ -36,6 +114,8 @@ function parseArgs(argv) {
     else if (a === '--out') opts.out = argv[++i];
     else if (a === '--check') opts.check = true;
     else if (a === '--clean') opts.clean = true;
+    else if (a.startsWith('--lang=')) opts.lang = a.slice(7);
+    else if (a === '--lang') opts.lang = argv[++i];
     else if (a.startsWith('--layout=')) opts.layout = a.slice(9);
     else if (a === '--json') opts.json = true;
     else if (a === '-h' || a === '--help') opts.help = true;
@@ -459,7 +539,7 @@ function relationshipSVG(parsed, meta, opts = {}) {
     const cross = clusterOf && clusterOf.has(e.a) && clusterOf.has(e.b) && clusterOf.get(e.a) !== clusterOf.get(e.b);
     // 线本身也要带 data-a/data-b：面板按这两个属性做「悬停某人只留他的关系」，
     // 只给标签挂属性会让大多数连线在悬停时纹丝不动（跨簇连线更是连标签都不画）。
-    const tip = opts.clean ? '' : (e.label ? `${s.label} / ${e.label}` : s.label);
+    const tip = opts.clean ? '' : (e.label ? `${relLabel(s.key)} / ${e.label}` : relLabel(s.key));
     // 敌对关系的 × 记号也放进同一个 group：否则悬停压暗时线暗了、记号还亮着
     const d = `M ${fmt(g.x1)} ${fmt(g.y1)} Q ${fmt(g.cx)} ${fmt(g.cy)} ${fmt(g.x2)} ${fmt(g.y2)}`;
     // 提示由面板按「离鼠标最近的线」几何判定，这里不再铺透明热区
@@ -485,7 +565,7 @@ function relationshipSVG(parsed, meta, opts = {}) {
     // 悬停某个人时由面板把它显示出来，否则高亮出来的线没有名字，看不出是什么关系。
     const crossLabel = !!(clusterOf && clusterOf.has(e.a) && clusterOf.has(e.b) && clusterOf.get(e.a) !== clusterOf.get(e.b));
     const s = REL[e.kind];
-    const text = REL[e.kind]?.label || '';
+    const text = relLabel(e.kind);
     const tip = opts.clean ? '' : (e.label || '');
     // 两行：上行「关系」，下行「张力」；比一行 20 多字更容易塞进窄缝
     const wrap = (l) => {
@@ -568,14 +648,14 @@ function relationshipSVG(parsed, meta, opts = {}) {
       const x = 34 + i * 96;
       return `<line x1="${x}" y1="72" x2="${x + 22}" y2="72" stroke="${s.stroke}" stroke-width="${s.width}"
         stroke-linecap="round" ${s.dash ? `stroke-dasharray="${s.dash}"` : ''}/>
-        <text x="${x + 28}" y="76" font-family='${FONT}' font-size="11" fill="${MUTE}">${s.label}</text>`;
+        <text x="${x + 28}" y="76" font-family='${FONT}' font-size="11" fill="${MUTE}">${esc(relLabel(s.key))}</text>`;
     })
     .join('\n  ');
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
   <rect width="${W}" height="${H}" fill="${BG}"/>
-  <text x="34" y="40" font-family='${FONT}' font-size="14" fill="${INK}" font-weight="600">${esc(meta.title || '人物关系图')}</text>
-  <text x="34" y="57" font-family='${FONT}' font-size="11" fill="${MUTE}">圈越大越重要｜共 ${parsed.nodes.length} 人 · ${parsed.edges.length} 条关系</text>
+  <text x="34" y="40" font-family='${FONT}' font-size="14" fill="${INK}" font-weight="600">${esc(meta.title || tr('rel.title'))}</text>
+  <text x="34" y="57" font-family='${FONT}' font-size="11" fill="${MUTE}">${esc(tr('rel.meta', { people: parsed.nodes.length, edges: parsed.edges.length }))}</text>
   ${legend}
   ${parts.join('\n  ')}
 </svg>`;
@@ -682,7 +762,7 @@ function plotSVG(data, meta) {
     // 章号本身是「溯源」入口：面板里点它会展开这一章的分数依据
     parts.push(`<text class="chapter-hit" data-chapter="${esc(String(c))}" x="${fmt(X(i))}" y="${H - B + 22}" text-anchor="middle" font-family='${FONT}' font-size="11" fill="${MUTE}" style="cursor:pointer">${c}</text>`);
   });
-  parts.push(`<text x="${L}" y="${H - 14}" font-family='${FONT}' font-size="11" fill="${MUTE}">章</text>`);
+  parts.push(`<text x="${L}" y="${H - 14}" font-family='${FONT}' font-size="11" fill="${MUTE}">${esc(tr('plot.axis'))}</text>`);
 
   const seen = new Map(); // 两条线数值完全相同时会互相盖住：后画的改成虚线并微微错开
   data.series.forEach((name, si) => {
@@ -722,9 +802,9 @@ function plotSVG(data, meta) {
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
   <rect width="${W}" height="${H}" fill="${BG}"/>
-  <text x="34" y="40" font-family='${FONT}' font-size="14" fill="${INK}" font-weight="600">${esc(meta.title || '情节发展地图 · 故事线强度')}</text>
-  <text x="34" y="58" font-family='${FONT}' font-size="11" fill="${MUTE}">每条折线一条故事线｜转折处用单调三次曲线连接｜圆圈是每章实际取值</text>
-  <text x="34" y="74" font-family='${FONT}' font-size="10.5" fill="${MUTE}">共 ${chapters.length} 章 · ${data.series.length} 条线</text>
+  <text x="34" y="40" font-family='${FONT}' font-size="14" fill="${INK}" font-weight="600">${esc(meta.title || tr('plot.title'))}</text>
+  <text x="34" y="58" font-family='${FONT}' font-size="11" fill="${MUTE}">${esc(tr('plot.sub'))}</text>
+  <text x="34" y="74" font-family='${FONT}' font-size="10.5" fill="${MUTE}">${esc(tr('plot.meta', { chapters: chapters.length, lines: data.series.length }))}</text>
   ${parts.join('\n  ')}
 </svg>`;
 }
@@ -766,17 +846,17 @@ function scenesCollapsedSVG(rows, meta) {
   const H = Math.max(320, top + chapters.length * rowH + 24);
   const parts = [];
   parts.push(`<rect x="0" y="0" width="${W}" height="${H}" fill="#12141a"/>`);
-  parts.push(`<text x="34" y="38" font-family='${FONT}' font-size="17" font-weight="600" fill="#e8ecf2">${esc(meta.title || '情节发展地图 · 场景节点')}</text>`);
-  parts.push(`<text x="34" y="58" font-family='${FONT}' font-size="11" fill="${MUTE}">${rows.length} 个场景超过 30，已按章折叠；展开看场景请按卷拆分或改小 range</text>`);
+  parts.push(`<text x="34" y="38" font-family='${FONT}' font-size="17" font-weight="600" fill="#e8ecf2">${esc(meta.title || tr('scenes.title'))}</text>`);
+  parts.push(`<text x="34" y="58" font-family='${FONT}' font-size="11" fill="${MUTE}">${esc(tr('scenes.folded', { n: rows.length }))}</text>`);
 
   chapters.forEach((ch, i) => {
     const list = rows.filter((r) => r.chapter === ch);
     const y = top + i * rowH;
-    const tags = [...new Set(list.map((r) => r.tag).filter(Boolean))].join(' · ');
+    const tags = [...new Set(list.map((r) => tagText(r.tag)).filter(Boolean))].join(' · ');
     const first = list[0] ? list[0].event : '';
     const turns = list.filter((r) => /转折|反转/.test(r.tag || '')).length;
     parts.push(`<rect x="34" y="${y}" width="${W - 68}" height="${rowH - 14}" rx="8" fill="#171a21" stroke="#2a2f3a"/>`);
-    parts.push(`<text x="50" y="${y + 24}" font-family='${FONT}' font-size="12.5" font-weight="600" fill="#c9d2de">第 ${ch} 章 · ${list.length} 个场景${turns ? ` · ${turns} 个转折` : ''}</text>`);
+    parts.push(`<text x="50" y="${y + 24}" font-family='${FONT}' font-size="12.5" font-weight="600" fill="#c9d2de">${esc(turns ? tr('scenes.chapterBandTurns', { n: ch, scenes: list.length, turns }) : tr('scenes.chapterBand', { n: ch, scenes: list.length }))}</text>`);
     parts.push(`<text x="50" y="${y + 41}" font-family='${FONT}' font-size="11" fill="${MUTE}">${esc(`${first}${tags ? ` ｜ ${tags}` : ''}`.slice(0, 62))}</text>`);
   });
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
@@ -808,8 +888,8 @@ function scenesSVG(rows, meta) {
 
   const parts = [];
   parts.push(`<rect x="0" y="0" width="${W}" height="${H}" fill="#12141a"/>`);
-  parts.push(`<text x="34" y="38" font-family='${FONT}' font-size="17" font-weight="600" fill="#e8ecf2">${meta.title || '情节发展地图 · 场景节点'}</text>`);
-  parts.push(`<text x="34" y="58" font-family='${FONT}' font-size="11" fill="${MUTE}">按章自上而下；同一章内按场景顺序；红线为转折，黄线为埋点，青线为回收点</text>`);
+  parts.push(`<text x="34" y="38" font-family='${FONT}' font-size="17" font-weight="600" fill="#e8ecf2">${esc(meta.title || tr('scenes.title'))}</text>`);
+  parts.push(`<text x="34" y="58" font-family='${FONT}' font-size="11" fill="${MUTE}">${esc(tr('scenes.sub'))}</text>`);
 
   const cx = W / 2;
   // 主干
@@ -818,7 +898,7 @@ function scenesSVG(rows, meta) {
   layout.forEach((item, idx) => {
     if (item.kind === 'chapter') {
       parts.push(`<circle cx="${cx}" cy="${item.y + 8}" r="9" fill="#12141a" stroke="#7f8ea3" stroke-width="1.6"/>`);
-      parts.push(`<text x="${cx + 22}" y="${item.y + 13}" font-family='${FONT}' font-size="12.5" font-weight="600" fill="#c9d2de">第 ${item.chapter} 章</text>`);
+      parts.push(`<text x="${cx + 22}" y="${item.y + 13}" font-family='${FONT}' font-size="12.5" font-weight="600" fill="#c9d2de">${esc(tr('scenes.chapter', { n: item.chapter }))}</text>`);
       return;
     }
     const r = item.row;
@@ -841,8 +921,9 @@ function scenesSVG(rows, meta) {
       return out.slice(0, 2);
     };
     // 徽章占掉右上角：先按徽章宽度算出正文一行能用几个字，避免文字钻到徽章底下
-    const cw = r.tag ? Math.min(150, r.tag.length * 8.6 + 18) : 0;
-    const wrapW = r.tag ? Math.max(10, Math.floor((w - 28 - cw - 10) / 12.4)) : 24;
+    const tagLabel = tagText(r.tag);
+    const cw = tagLabel ? Math.min(150, tagLabel.length * 8.6 + 18) : 0;
+    const wrapW = tagLabel ? Math.max(10, Math.floor((w - 28 - cw - 10) / 12.4)) : 24;
     // 第一行要让开右上角徽章，第二行起可以整行到底
     const cut1 = (txt, n) => {
       if (txt.length <= n) return [txt, ''];
@@ -857,12 +938,12 @@ function scenesSVG(rows, meta) {
       parts.push(`<text x="${x + 14}" y="${item.y + 22 + k * 16}" font-family='${FONT}' font-size="12.5" fill="#e8ecf2">${esc(ln)}${k === lines.length - 1 && r.event.length > lines.join('').length ? '…' : ''}</text>`);
     });
     // 标记做成右上角小徽章：不再和人物名挤一行，避免「转折」被卡框切掉
-    if (r.tag) {
+    if (tagLabel) {
       const chipX = x + w - 12 - cw;
       parts.push(`<rect x="${fmt(chipX)}" y="${item.y + 9}" width="${fmt(cw)}" height="17" rx="8.5"
         fill="#171a21" stroke="${tagColor || '#3a4150'}" stroke-opacity=".7"/>`);
       parts.push(`<text x="${fmt(chipX + cw / 2)}" y="${item.y + 21}" text-anchor="middle" font-family='${FONT}'
-        font-size="10" fill="${tagColor || MUTE}">${esc(r.tag)}</text>`);
+        font-size="10" fill="${tagColor || MUTE}">${esc(tagLabel)}</text>`);
     }
     const whoMax = 22;
     const who = r.who && r.who.length > whoMax ? `${r.who.slice(0, whoMax - 1)}…` : (r.who || '');
@@ -905,6 +986,7 @@ function readText(file) {
 
 function main() {
   const opts = parseArgs(process.argv.slice(2));
+  setLang(opts.lang);
   if (opts.help) {
     console.log('用法：node render-graph.mjs [--project novel-project] [--out <目录>] [--check] [--json]');
     process.exit(0);
@@ -943,11 +1025,11 @@ function main() {
         withTiers(parsed, tierTable);
         if (parsed.nodes.length > 30) warn(`关系图有 ${parsed.nodes.length} 人，超过 30：技能要求拆成主图 + 附表`);
         else if (parsed.nodes.length > 15) warn(`关系图有 ${parsed.nodes.length} 人，超过 15：建议只画主要人物，其余进文字表`);
-        const svg = relationshipSVG(parsed, { title: opts.clean ? '人物关系图（无剧透版）' : '人物关系图' }, { clean: opts.clean, layout: opts.layout });
+        const svg = relationshipSVG(parsed, { title: opts.clean ? tr('rel.titleClean') : tr('rel.title') }, { clean: opts.clean, layout: opts.layout });
         const file = join(outDir, opts.clean ? 'relationship-map-clean.svg' : 'relationship-map.svg');
         if (!opts.check) writeFileSync(file, svg);
         const clean = join(outDir, 'relationship-map-clean.svg');
-        if (!opts.check) writeFileSync(clean, relationshipSVG(parsed, { title: '人物关系图（无剧透版）' }, { clean: true, layout: opts.layout }));
+        if (!opts.check) writeFileSync(clean, relationshipSVG(parsed, { title: tr('rel.titleClean') }, { clean: true, layout: opts.layout }));
         result.relations = { nodes: parsed.nodes.length, edges: parsed.edges.length, file: relative(process.cwd(), file) };
         if (!opts.check) result.files.push(result.relations.file);
       }
@@ -977,7 +1059,7 @@ function main() {
           if (!rows.length) continue;
           const sub = { series: series.series, rows };
           const file = join(outDir, `plot-map-vol-${String(v.vol).padStart(2, '0')}.svg`);
-          if (!opts.check) writeFileSync(file, plotSVG(sub, { title: `情节发展地图 · 故事线强度（${v.label}）` }));
+          if (!opts.check) writeFileSync(file, plotSVG(sub, { title: tr('plot.titleVol', { vol: v.label }) }));
           const rel = relative(process.cwd(), file);
           vols.push({ vol: v.vol, label: v.label, from: v.from, to: v.to, chapters: rows.length, file: rel });
           if (!opts.check) result.files.push(rel);
@@ -985,7 +1067,7 @@ function main() {
         if (!vols.length) warn('按卷切图失败：分卷范围与强度表的章号对不上');
         result.plot = { chapters: series.rows.length, series: series.series.length, split: true, volumes: vols, file: null };
       } else {
-        const svg = plotSVG(series, { title: '情节发展地图 · 故事线强度' });
+        const svg = plotSVG(series, { title: tr('plot.title') });
         const file = join(outDir, 'plot-map.svg');
         if (!opts.check) writeFileSync(file, svg);
         result.plot = { chapters: series.rows.length, series: series.series.length, file: relative(process.cwd(), file) };
@@ -993,7 +1075,7 @@ function main() {
       }
       if (scenes) {
         const sfile = join(outDir, 'plot-map-scenes.svg');
-        if (!opts.check) writeFileSync(sfile, scenesSVG(scenes, { title: '情节发展地图 · 场景节点' }));
+        if (!opts.check) writeFileSync(sfile, scenesSVG(scenes, { title: tr('scenes.title') }));
         result.scenes = { rows: scenes.length, collapsed: scenes.length > 30, file: relative(process.cwd(), sfile) };
         if (!opts.check) result.files.push(result.scenes.file);
       }

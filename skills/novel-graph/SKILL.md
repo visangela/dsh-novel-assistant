@@ -169,6 +169,8 @@ flowchart TD
 node <技能 Base directory>/tools/graph-sync.mjs --project novel-project
 # 2) 再从表画图
 node <技能 Base directory>/tools/render-graph.mjs --project novel-project
+# 界面语言是英文时，SVG 里的标签也要出英文（人名、事件、伏笔编号不翻译，只翻我们自己的标签与说明）
+node <技能 Base directory>/tools/render-graph.mjs --project novel-project --lang en
 ```
 
 `graph-sync` 的退出码：0 全同步；1 有告警（已写章节缺强度分、人物缺小传、表缺列）；2 读不到设定库。`--check` 只检查不写盘，`--init` 在两张 `.md` 不存在时生成初版骨架（阶段 3 用）。
@@ -235,6 +237,8 @@ node <技能 Base directory>/tools/render-graph.mjs --project novel-project
 ### 定稿交付：四张图
 
 图上默认只显示关系类型（亲情/敌对/利益/爱情），张力写在 SVG 的 `<title>` 与 `data-tip` 里，鼠标停上去才看得到；无剧透版两者都不写。面板把 SVG 内联渲染，并用自绘浮层显示 `data-tip`（不依赖原生 tooltip），所以悬停能稳定生效；单独用 `<img>` 引用 .svg 则只有原生提示，某些环境不弹。
+
+`--lang zh|en`（默认 `zh`）只影响**我们自己写的字**：标题、说明、图例、关系类型、伏笔标记（埋/收/转折→Plant/Payoff/Turn）、章号与「N 个场景」。人名、事件文本、伏笔编号、作者写的括号备注都原样保留。
 
 `render-graph.mjs` 一次产出四份：
 
